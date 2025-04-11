@@ -1,0 +1,73 @@
+
+using System;
+using System.Diagnostics;
+using System.Management;
+
+class Program
+{
+    static void Main()
+    {
+        if (CheckBCD() || CheckWMI() || CheckPowerShell())
+        {
+            Console.WriteLine("The OS is running from a virtual disk.");
+        }
+        else
+        {
+            Console.WriteLine("The OS is not running from a virtual disk.");
+        }
+    }
+
+    static bool CheckBCD()
+    {
+        Process process = new Process();
+        process.StartInfo.FileName = "bcdedit";
+        process.StartInfo.Arguments = "/enum all";
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
+        process.Start();
+
+        string output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+
+        return output.Contains(".vhd") || output.Contains(".vhdx");
+    }
+
+    static bool CheckWMI()
+    {
+        try
+        {
+            ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive WHERE MediaType='Fixed hard disk media'");
+            foreach (ManagementObject disk in searcher.Get())
+            {
+                if (disk["Model"].ToString().Contains("VHD"))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"An error occurred: {e.Message}");
+        }
+        return false;
+    }
+
+    static bool CheckPowerShell()
+    {
+        Process process = new Process();
+        process.StartInfo.FileName = "powershell";
+        process.StartInfo.Arguments = "Get-Disk | Where-Object { $_.BusType -eq 'Virtual' }";
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
+        process.Start();
+
+        string output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+
+        return !string.IsNullOrEmpty(output);
+    }
+}
+
+
